@@ -1,0 +1,19 @@
+{
+  "manifest_version": 3,
+  "name": "Page Summarizer",
+  "version": "1.0.0",
+  "description": "Generate AI summaries of the current webpage",
+
+  "permissions": [
+    "activeTab",
+    "scripting"
+  ],
+
+  "action": {
+    "default_popup": "popup/popup.html"
+  },
+
+  "background": {
+    "service_worker": "background/service-worker.js"
+  }
+}
