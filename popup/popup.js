@@ -1,3 +1,127 @@
+function displaySummary(summary) {
+
+    const result = document.getElementById("result");
+
+    // Clear previous result
+    result.innerHTML = "";
+
+    // Remove escape characters
+    summary = summary.replace(/\\([#*])/g, "$1");
+
+    const lines = summary.split("\n");
+
+    let bulletList = null;
+
+    lines.forEach(line => {
+
+        line = line.trim();
+
+        // Ignore empty lines
+        if (!line) {
+            return;
+        }
+
+        // --------------------------------
+        // Detect section headings
+        // Examples:
+        // - Overview*
+        // - Key Points*
+        // ### Overview
+        // --------------------------------
+
+        let headingText = null;
+
+        if (line.startsWith("###")) {
+
+            headingText = line
+                .replace(/^###\s*/, "")
+                .replace(/\*+$/, "")
+                .trim();
+
+        } else if (/^[-•*]\s*.+\*+$/.test(line)) {
+
+            headingText = line
+                 .replace(/^[-•*]\s*/, "")
+                 .replace(/^\*+|\*+$/g, "")
+                 .trim();
+        }
+
+        if (headingText) {
+
+            bulletList = null;
+
+            const heading = document.createElement("h3");
+
+            heading.textContent = headingText;
+
+            heading.className = "summary-heading";
+
+            result.appendChild(heading);
+
+            return;
+        }
+
+        // --------------------------------
+        // Normal bullet point
+        // --------------------------------
+
+        if (
+            line.startsWith("•") ||
+            line.startsWith("-") ||
+            line.startsWith("*")
+        ) {
+
+            if (!bulletList) {
+
+                bulletList = document.createElement("ul");
+
+                bulletList.className = "summary-list";
+
+                result.appendChild(bulletList);
+            }
+
+            const li = document.createElement("li");
+
+            let text = line.replace(/^[•*-]\s*/, "");
+
+            // Remove bold Markdown
+            text = text.replace(/\*\*(.*?)\*\*/g, "$1");
+
+            // Remove italic Markdown
+            text = text.replace(/\*(.*?)\*/g, "$1");
+
+            li.textContent = text;
+
+            bulletList.appendChild(li);
+
+            return;
+        }
+
+        // --------------------------------
+        // Normal paragraph
+        // --------------------------------
+
+        bulletList = null;
+
+        const paragraph = document.createElement("p");
+
+        let text = line;
+
+        // Remove bold Markdown
+        text = text.replace(/\*\*(.*?)\*\*/g, "$1");
+
+        // Remove italic Markdown
+        text = text.replace(/\*(.*?)\*/g, "$1");
+
+        paragraph.textContent = text;
+
+        paragraph.className = "summary-text";
+
+        result.appendChild(paragraph);
+    });
+}
+
+
 document
     .getElementById("summarizeBtn")
     .addEventListener("click", async function () {
@@ -90,7 +214,7 @@ try {
 
     if (response.ok) {
 
-        result.innerText = data.summary;
+        displaySummary(data.summary);
 
     } else {
 

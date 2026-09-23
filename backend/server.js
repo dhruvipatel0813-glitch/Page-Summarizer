@@ -1,102 +1,3 @@
-// require("dotenv").config();
-
-// const express = require("express");
-// const cors = require("cors");
-// const { GoogleGenAI } = require("@google/genai");
-
-// const app = express();
-
-// const client = new GoogleGenAI({
-//     apiKey: process.env.GEMINI_API_KEY
-// });
-
-// console.log(
-//     "Gemini API key loaded:",
-//     !!process.env.GEMINI_API_KEY
-// );
-
-// app.use(cors());
-// app.use(express.json());
-
-// app.get("/", (req, res) => {
-//     res.send("Page Summarizer Backend is running!");
-// });
-
-// app.post("/summarize", async (req, res) => {
-
-//     const text = req.body.text;
-
-//     // Check if text exists
-//     if (!text) {
-//         return res.status(400).json({
-//             error: "No text was provided."
-//         });
-//     }
-
-//     // Check if text is a string
-//     if (typeof text !== "string") {
-//         return res.status(400).json({
-//             error: "Text must be a string."
-//         });
-//     }
-
-//     // Remove unnecessary whitespace
-//     const cleanedText = text.trim();
-
-//     // Check if text is empty
-//     if (cleanedText.length === 0) {
-//         return res.status(400).json({
-//             error: "Text cannot be empty."
-//         });
-//     }
-
-
-//     let response;
-
-// try {
-
-//     response = await client.models.generateContent({
-//         model: "gemini-3.6-flash",
-//         contents: `Summarize the following text in a clear and concise way:
-
-// ${cleanedText}`
-//     });
-
-// } catch (error) {
-
-//     console.log("Gemini API error:", error);
-
-//     return res.status(500).json({
-//         error: "Gemini API is currently unavailable. Please try again later."
-//     });
-// }
-
-//     console.log("Received text:");
-//     console.log(cleanedText);
-
-//     res.json({
-//     summary: response.text
-//     });
-// });
-
-// app.get("/test-ai", async (req, res) => {
-
-//     const response = await client.models.generateContent({
-//         model: "gemini-3.6-flash",
-//         contents: "Say hello in one short sentence."
-//     });
-
-//     res.json({
-//         response: response.text
-//     });
-// });
-
-// app.listen(3000, () => {
-//     console.log("Server running on http://localhost:3000");
-// });
-
-
-
 require("dotenv").config();
 
 const express = require("express");
@@ -194,7 +95,7 @@ app.post("/summarize", async (req, res) => {
         });
     }
 
-    // Remove unnecessary whitespace
+    // Clean text
     const cleanedText = text.trim();
 
     // Check if text is empty
@@ -204,79 +105,168 @@ app.post("/summarize", async (req, res) => {
         });
     }
 
-    const chunkSize = 10000;
+    console.log("Total characters:", cleanedText.length);
 
-const chunks = splitIntoChunks(cleanedText, chunkSize);
+    /*
+     * NORMAL WEBPAGE
+     *
+     * If the webpage is small enough, send it directly
+     * to Gemini in ONE request.
+     */
 
-console.log("Total characters:", cleanedText.length);
-console.log("Total chunks:", chunks.length);
+    const normalPageLimit = 25000;
+
+    if (cleanedText.length <= normalPageLimit) {
+
+        console.log("Normal webpage detected.");
+        console.log("Sending one request to Gemini...");
+
+        try {
+
+            const response = await generateWithRetry(
+                `Summarize the following webpage.
+
+Instructions:
+- Start with a short section called "Overview".
+- Then provide a section called "Key Highlights".
+- Use concise bullet points.
+- Preserve important facts, names, numbers, dates, and technical details.
+- Remove repetition and unnecessary wording.
+- Do not add information that is not present in the webpage.
+- Make the summary easy to scan and understand.
+- Do not mention that you are summarizing webpage text.
+
+Webpage:
+
+${cleanedText}`
+            );
+
+            console.log("Webpage summarized successfully.");
+
+            return res.json({
+                summary: response.text
+            });
+
+        } catch (error) {
+
+            console.log("Gemini API error:", error);
+
+            return res.status(500).json({
+                error: "Gemini API is currently unavailable. Please try again later."
+            });
+        }
+    }
 
 
-    let response;
+    /*
+     * LONG WEBPAGE
+     *
+     * For larger webpages, divide the content into
+     * larger chunks and summarize each chunk.
+     */
 
-const summaries = [];
+    const chunkSize = 15000;
 
-try {
+    const chunks = splitIntoChunks(
+        cleanedText,
+        chunkSize
+    );
 
-    for (let i = 0; i < chunks.length; i++) {
+    console.log("Long webpage detected.");
+    console.log("Total chunks:", chunks.length);
 
-        console.log(`Sending chunk ${i + 1} of ${chunks.length} to Gemini...`);
+    const summaries = [];
 
-        const response = await generateWithRetry(
-    `Extract the most important information from the following webpage section.
+    try {
 
-Rules:
-- Give 3 to 5 concise bullet points.
-- Keep important facts, names, numbers, dates, and technical details.
+        for (let i = 0; i < chunks.length; i++) {
+
+            console.log(
+                `Sending chunk ${i + 1} of ${chunks.length} to Gemini...`
+            );
+
+            const response = await generateWithRetry(
+                `Extract the most important information from the following webpage section.
+
+Instructions:
+- Give only the most important information.
+- Use concise bullet points.
+- Preserve important facts, names, numbers, dates, and technical details.
 - Remove repetition and unnecessary wording.
 - Do not add information that is not present in the text.
-- Focus only on information useful for understanding the webpage.
+- Keep the response short.
 
 Webpage section:
 
 ${chunks[i]}`
-);
+            );
 
-        summaries.push(response.text);
+            summaries.push(response.text);
 
-        console.log(`Chunk ${i + 1} summarized successfully.`);
+            console.log(
+                `Chunk ${i + 1} summarized successfully.`
+            );
+        }
+
+    } catch (error) {
+
+        console.log("Gemini API error:", error);
+
+        return res.status(500).json({
+            error: "Gemini API is currently unavailable. Please try again later."
+        });
     }
 
-} catch (error) {
 
-    console.log("Gemini API error:", error);
-
-    return res.status(500).json({
-        error: "Gemini API is currently unavailable. Please try again later."
-    });
-}
-
-    console.log("All chunks summarized successfully.");
+    /*
+     * FINAL SUMMARY
+     *
+     * Combine the smaller chunk summaries into one
+     * final response.
+     */
 
     const combinedText = summaries.join("\n\n");
 
-const finalResponse = await generateWithRetry(
-    `Create a final summary of the webpage using the section summaries below.
+    console.log(
+        "Combined summary characters:",
+        combinedText.length
+    );
+
+    try {
+
+        const finalResponse = await generateWithRetry(
+            `Create a final summary of the webpage using the information below.
 
 Instructions:
-- Start with a short overview of what the webpage is about.
-- Then provide the most important points as bullet points.
-- Combine related information from different sections.
-- Remove duplicate or repetitive information.
+- Start with a short section called "Overview".
+- Then provide a section called "Key Highlights".
+- Use concise bullet points.
+- Combine related information.
+- Remove duplicate information.
 - Preserve important facts, names, numbers, dates, and technical details.
-- Do not add information that is not present in the section summaries.
-- Keep the final summary concise but informative.
-- Make the result easy to read.
-- Do not mention that the webpage was divided into sections or chunks.
+- Do not add information that is not present in the provided information.
+- Make the final result concise and easy to scan.
+- Do not mention chunks or sections.
 
-Section summaries:
+Information:
 
 ${combinedText}`
-);
+        );
 
-res.json({
-    summary: finalResponse.text
-});
+        console.log("Final summary generated successfully.");
+
+        return res.json({
+            summary: finalResponse.text
+        });
+
+    } catch (error) {
+
+        console.log("Final Gemini request failed:", error);
+
+        return res.status(500).json({
+            error: "Gemini is currently unavailable while creating the final summary."
+        });
+    }
 });
 
 app.get("/test-ai", async (req, res) => {

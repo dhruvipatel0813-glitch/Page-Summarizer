@@ -1,20 +1,39 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Page Summarizer</title>
     <link rel="stylesheet" href="popup.css">
 </head>
 
 <body>
 
-    <h2>Page Summarizer</h2>
+    <div class="container">
 
-    <button id="summarizeBtn">
-        Generate Summary
-    </button>
+        <div class="header">
+            <div class="logo">✦</div>
 
-    <div id="result">
-        Summary will appear here...
+            <div>
+                <h2>Page Summarizer</h2>
+                <p>AI-powered webpage summaries</p>
+            </div>
+        </div>
+
+        <button id="summarizeBtn">
+            <span>✦</span>
+            Generate Summary
+        </button>
+
+        <div id="result">
+            <p class="placeholder">
+                Your summary will appear here...
+            </p>
+        </div>
+
+        <div class="footer">
+            Powered by Gemini AI
+        </div>
+
     </div>
 
     <script src="popup.js"></script>
