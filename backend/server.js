@@ -3,6 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const { GoogleGenAI } = require("@google/genai");
+const Groq = require("groq-sdk");
 
 const app = express();
 
@@ -10,9 +11,18 @@ const client = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY
 });
 
+const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY
+});
+
 console.log(
     "Gemini API key loaded:",
     !!process.env.GEMINI_API_KEY
+);
+
+console.log(
+    "Groq API key loaded:",
+    !!process.env.GROQ_API_KEY
 );
 
 app.use(cors());
@@ -77,6 +87,55 @@ async function generateWithRetry(prompt, maxRetries = 3) {
     }
 }
 
+async function generateWithGroq(prompt) {
+
+    const response = await groq.chat.completions.create({
+        model: "openai/gpt-oss-20b",
+        messages: [
+            {
+                role: "user",
+                content: prompt
+            }
+        ]
+    });
+
+    return response.choices[0].message.content;
+}
+
+async function generateWithFallback(prompt) {
+
+    try {
+
+        console.log("Trying Gemini...");
+
+        const response = await generateWithRetry(prompt);
+
+        console.log("Gemini succeeded.");
+
+        return response.text;
+
+    } catch (error) {
+
+        console.log("Gemini failed.");
+        console.log("Switching to Groq...");
+
+        try {
+
+            const response = await generateWithGroq(prompt);
+
+            console.log("Groq succeeded.");
+
+            return response;
+
+        } catch (groqError) {
+
+            console.log("Groq also failed.");
+
+            throw groqError;
+        }
+    }
+}
+
 app.post("/summarize", async (req, res) => {
 
     const text = req.body.text;
@@ -123,7 +182,7 @@ app.post("/summarize", async (req, res) => {
 
         try {
 
-            const response = await generateWithRetry(
+            const response = await generateWithFallback(
                 `Summarize the following webpage.
 
 Instructions:
@@ -144,7 +203,7 @@ ${cleanedText}`
             console.log("Webpage summarized successfully.");
 
             return res.json({
-                summary: response.text
+                summary: response
             });
 
         } catch (error) {
@@ -185,7 +244,7 @@ ${cleanedText}`
                 `Sending chunk ${i + 1} of ${chunks.length} to Gemini...`
             );
 
-            const response = await generateWithRetry(
+            const response = await generateWithFallback(
                 `Extract the most important information from the following webpage section.
 
 Instructions:
@@ -201,7 +260,7 @@ Webpage section:
 ${chunks[i]}`
             );
 
-            summaries.push(response.text);
+            summaries.push(response);
 
             console.log(
                 `Chunk ${i + 1} summarized successfully.`
@@ -234,7 +293,7 @@ ${chunks[i]}`
 
     try {
 
-        const finalResponse = await generateWithRetry(
+        const finalResponse = await generateWithFallback(
             `Create a final summary of the webpage using the information below.
 
 Instructions:
@@ -256,7 +315,7 @@ ${combinedText}`
         console.log("Final summary generated successfully.");
 
         return res.json({
-            summary: finalResponse.text
+            summary: finalResponse
         });
 
     } catch (error) {
@@ -279,6 +338,34 @@ app.get("/test-ai", async (req, res) => {
     res.json({
         response: response.text
     });
+});
+
+app.get("/test-groq", async (req, res) => {
+
+    try {
+
+        const response = await groq.chat.completions.create({
+            model: "openai/gpt-oss-20b",
+            messages: [
+                {
+                    role: "user",
+                    content: "Say hello in one short sentence."
+                }
+            ]
+        });
+
+        res.json({
+            response: response.choices[0].message.content
+        });
+
+    } catch (error) {
+
+        console.log("Groq API error:", error);
+
+        res.status(500).json({
+            error: "Groq API request failed."
+        });
+    }
 });
 
 app.listen(3000, () => {
