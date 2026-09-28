@@ -141,6 +141,17 @@ document
 
             func: () => {
 
+                // Check if the user has selected any text
+                const selectedText = window.getSelection().toString().trim();
+
+                // If text is selected, return only that text
+                if (selectedText) {
+                   return {
+                       text: selectedText,
+                       type: "selection"
+       ,            };
+                }
+
                 // Create a copy of the webpage body
                 const clonedBody = document.body.cloneNode(true);
 
@@ -178,11 +189,18 @@ document
                     .replace(/[ \t]+/g, " ")
                     .trim();
 
-                return text;
+                return{
+                    text: text,
+                    type: "page"
+                };
             }
         });
 
-        const pageText = results[0].result;
+        const extraction = results[0].result;
+
+        const pageText = extraction.text;
+
+        console.log("Text source:", extraction.type);
 
 const result = document.getElementById("result");
 const button = document.getElementById("summarizeBtn");
